@@ -12,7 +12,7 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-ENDPOINT = "https://mcp.deapi.ai/mcp"
+ENDPOINT = "https://mcp.deapi.ai/mcp?source=agent-zero"
 VERSION = "0.1.0"
 # Tells deAPI which integration a request came from. No user data.
 SOURCE_HEADERS = {"User-Agent": f"deapi-agent-zero/{VERSION}", "X-Deapi-Source": "agent-zero"}
