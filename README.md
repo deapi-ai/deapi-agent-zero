@@ -13,7 +13,7 @@ The tool list comes from the server, so new models and tools show up without a p
 
 ## Setup
 
-1. Create an API key at [app.deapi.ai/settings/api-keys](https://app.deapi.ai/settings/api-keys). New accounts get free credit.
+1. Create an API key at [app.deapi.ai/settings/api-keys](https://app.deapi.ai/settings/api-keys).
 2. Set `DEAPI_API_KEY` in the Agent Zero runtime environment (for Docker: `-e DEAPI_API_KEY=...` or the `.env` file that your container reads), then restart Agent Zero.
 3. Install the plugin from the Plugin Hub, or clone this repository into `/a0/usr/plugins/deapi`.
 
