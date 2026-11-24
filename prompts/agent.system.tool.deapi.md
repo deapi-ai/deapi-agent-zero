@@ -1,5 +1,5 @@
 ### deapi
-Run one deAPI tool: generate images, video, speech or music; transcribe audio and video files or links (YouTube, TikTok, X, Instagram, Twitch, Kick); describe a video; read text from images (OCR); remove backgrounds and upscale.
+Run one deAPI tool: generate images, video, speech or music; transcribe audio and video files or links (YouTube, TikTok, X, Twitch, Kick); describe a video; read text from images (OCR); remove backgrounds and upscale.
 Arguments: `tool` (required string, a deAPI tool name) and `arguments` (object with that tool's own parameters).
 Common tools: `video_url_transcription`, `audio_url_transcription`, `video_description`, `text_to_image`, `image_to_image`, `image_to_text`, `text_to_audio`, `text_to_music`, `text_to_video`, `image_to_video`, `get_available_models`, `get_balance`, `check_job_status`. Each one has a `*_price` twin that returns the cost without running the job.
 Model names change: call `get_available_models` or `deapi_tools` instead of guessing them.

@@ -1,6 +1,6 @@
 # deAPI for Agent Zero
 
-Gives [Agent Zero](https://github.com/agent0ai/agent-zero) image, video, speech and music generation, transcription of files and links (YouTube, TikTok, X, Instagram, Twitch, Kick), video description and OCR through [deAPI](https://deapi.ai).
+Gives [Agent Zero](https://github.com/agent0ai/agent-zero) image, video, speech and music generation, transcription of files and links (YouTube, TikTok, X, Twitch, Kick), video description and OCR through [deAPI](https://deapi.ai).
 
 The plugin connects to deAPI's hosted MCP server (`https://mcp.deapi.ai/mcp`) and adds two tools:
 
