@@ -108,3 +108,81 @@ def test_transport_errors_do_not_leak(monkeypatch):
     with pytest.raises(client.DeapiError) as err:
         asyncio.run(client.list_tools())
     assert "sk-dp-secret" not in str(err.value)
+
+
+KEY = "sk-dp-26669-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdef"
+RAW_KEY = "26669|AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdef"
+SECRET = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789abcdef"
+
+
+def fragments(secret, size=8):
+    return {secret[i : i + size] for i in range(len(secret) - size + 1)}
+
+
+def leaks(text, secret=SECRET):
+    return [f for f in fragments(secret) if f in text]
+
+
+def fake_result(text, is_error=False):
+    async def fake(key, timeout, action):
+        return SimpleNamespace(isError=is_error, content=[SimpleNamespace(type="text", text=text)])
+
+    return fake
+
+
+@pytest.mark.parametrize("offset", range(-len(KEY), 2))
+def test_key_cut_by_the_output_limit_does_not_leak(monkeypatch, offset):
+    # Put the key at every position around the cut, including straddling it.
+    monkeypatch.setenv("DEAPI_API_KEY", KEY)
+    text = "a" * (client.MAX_OUTPUT_CHARS + offset) + KEY + "b" * 500
+    monkeypatch.setattr(client, "_session_call", fake_result(text))
+    out = asyncio.run(client.call_tool("text_to_image", {}))
+    assert "[truncated," in out
+    assert not leaks(out)
+
+
+def test_key_cut_in_an_error_message_does_not_leak(monkeypatch):
+    monkeypatch.setenv("DEAPI_API_KEY", KEY)
+    text = "x" * (client.MAX_OUTPUT_CHARS - 10) + KEY
+    monkeypatch.setattr(client, "_session_call", fake_result(text, is_error=True))
+    with pytest.raises(client.DeapiError) as err:
+        asyncio.run(client.call_tool("text_to_image", {}))
+    assert not leaks(str(err.value))
+
+
+@pytest.mark.parametrize(
+    "key, echoed",
+    [
+        (KEY, KEY),
+        (KEY, "Bearer " + KEY),
+        (KEY, SECRET),  # secret part alone
+        (RAW_KEY, RAW_KEY),
+        (RAW_KEY, "26669%7C" + SECRET),  # URL-encoded raw key
+        ("dpn-sk-" + RAW_KEY, "dpn-sk-" + RAW_KEY),
+    ],
+)
+def test_every_form_of_the_key_is_redacted(monkeypatch, key, echoed):
+    monkeypatch.setenv("DEAPI_API_KEY", key)
+    monkeypatch.setattr(client, "_session_call", fake_result(f"before {echoed} after"))
+    out = asyncio.run(client.call_tool("text_to_image", {}))
+    assert out.startswith("before ") and out.endswith(" after")
+    assert "[REDACTED]" in out
+    assert not leaks(out)
+
+
+def test_short_key_parts_are_not_redacted_from_normal_text():
+    # Only the full key and a long secret part are replaced, so ids and words stay readable.
+    assert client._redact("job 26669 done, see sk-dp docs", KEY) == "job 26669 done, see sk-dp docs"
+
+
+def test_tool_list_is_redacted_and_limited(monkeypatch):
+    monkeypatch.setenv("DEAPI_API_KEY", KEY)
+    long_tool = tool("echo", "Echo " + KEY, {"x": {"type": "string", "description": "y" * 30000}})
+
+    async def fake(key, timeout, action):
+        return SimpleNamespace(tools=[long_tool])
+
+    monkeypatch.setattr(client, "_session_call", fake)
+    out = asyncio.run(client.list_tools())
+    assert not leaks(out)
+    assert len(out) <= client.MAX_OUTPUT_CHARS + 60

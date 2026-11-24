@@ -7,13 +7,14 @@ models and tools appear without a plugin update.
 import asyncio
 import json
 import os
+from urllib.parse import quote
 
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
 ENDPOINT = "https://mcp.deapi.ai/mcp?source=agent-zero"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 # Tells deAPI which integration a request came from. No user data.
 SOURCE_HEADERS = {"User-Agent": f"deapi-agent-zero/{VERSION}", "X-Deapi-Source": "agent-zero"}
 LIST_TIMEOUT_SECONDS = 60
@@ -45,8 +46,38 @@ def _http_client(headers=None, timeout=None, auth=None):
     )
 
 
+REDACTED = "[REDACTED]"
+# The secret part of a key is long; a shorter tail would match ordinary text.
+MIN_SECRET_TAIL = 16
+
+
+def _secret_forms(key: str) -> list[str]:
+    """The key as it may appear in a response: as is, URL-encoded, JSON-escaped,
+    and its secret part alone (after the last '-' of sk-dp-<id>-<secret> or the
+    '|' of a raw <id>|<secret> key). Longest first, so no form is left half-replaced."""
+    forms = {key, quote(key, safe=""), json.dumps(key)[1:-1]}
+    for separator in ("|", "-"):
+        tail = key.rsplit(separator, 1)[-1]
+        if len(tail) >= MIN_SECRET_TAIL:
+            forms.add(tail)
+            forms.add(quote(tail, safe=""))
+    return sorted((form for form in forms if form), key=len, reverse=True)
+
+
 def _redact(text: str, key: str) -> str:
-    return text.replace(key, "[REDACTED]") if key else text
+    if not key:
+        return text
+    for form in _secret_forms(key):
+        text = text.replace(form, REDACTED)
+    return text
+
+
+def _limit(text: str) -> str:
+    """Trim long output. Call only on text that is already redacted: trimming
+    first could cut the key in two and leave a fragment that redaction misses."""
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    return text[:MAX_OUTPUT_CHARS] + f"\n[truncated, {len(text)} characters in total]"
 
 
 async def _session_call(key: str, timeout: float, action):
@@ -101,7 +132,7 @@ async def list_tools(query: str = "") -> str:
     key = _api_key()
     try:
         result = await _session_call(key, LIST_TIMEOUT_SECONDS, lambda s: s.list_tools())
-        return _redact(format_tools(result.tools, query), key)
+        return _limit(_redact(format_tools(result.tools, query), key))
     except DeapiError:
         raise
     except TimeoutError:
@@ -142,9 +173,8 @@ async def call_tool(name: str, arguments) -> str:
         ) from None
     texts = [block.text for block in result.content if getattr(block, "type", "") == "text"]
     text = "\n".join(texts).strip() or "deAPI returned no text."
-    if len(text) > MAX_OUTPUT_CHARS:
-        text = text[:MAX_OUTPUT_CHARS] + f"\n[truncated, {len(text)} characters in total]"
-    text = _redact(text, key)
+    # Redact before trimming, never after: see _limit.
+    text = _limit(_redact(text, key))
     if result.isError:
         raise DeapiError(f"deAPI rejected the call: {text}")
     return text
