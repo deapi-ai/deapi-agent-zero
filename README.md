@@ -22,7 +22,6 @@ Then ask, for example: *"Transcribe https://www.youtube.com/watch?v=... and summ
 ## Notes
 
 - Jobs are paid from your deAPI balance. Check it with the `get_balance` tool.
-- deAPI filters NSFW content. A rejected prompt comes back as an error message, not as a broken tool.
 - The key is sent only to `mcp.deapi.ai`, without environment proxies or redirects, and is removed from tool output. Requests carry the `deapi-agent-zero` user agent so deAPI can see traffic from this plugin; nothing about you or your prompts is added.
 - To remove the plugin, delete `/a0/usr/plugins/deapi` or turn it off in the Plugin Hub.
 
